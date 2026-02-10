@@ -6,6 +6,7 @@ Sensors:<br><br>
 ● MPU6050 (Accel/Gyro): Wrist-mounted. Detects fall impacts (>3g)
 and tracks activity.<br>
 [(https://invensense.tdk.com/wp-content/uploads/2015/02/MPU-6000-Datasheet1.pdf) ](https://invensense.tdk.com/wp-content/uploads/2015/02/MPU-6000-Datasheet1.pdf)<br>
+[https://invensense.tdk.com/wp-content/uploads/2015/02/MPU-6000-Register-Map1.pdf ](https://invensense.tdk.com/wp-content/uploads/2015/02/MPU-6000-Register-Map1.pdf)<br>
 ● MAX30102 (Pulse/Ox): Fingertip clip. Validates distress via heart
 rate/SpO2.<br>
 [(https://www.analog.com/media/en/technical-documentation/data-sheets/max30102.pdf)](https://www.analog.com/media/en/technical-documentation/data-sheets/max30102.pdf)]<br>
