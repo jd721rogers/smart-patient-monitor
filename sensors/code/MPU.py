@@ -17,6 +17,9 @@ class MPU6050:
         self.x_gyro_bias = 0
         self.y_gyro_bias = 0
         self.z_gyro_bias = 0
+        self.x_accel_bias = 0
+        self.y_accel_bias = 0
+        self.z_accel_bias = 0
         
         self.mpu6050_addr = 0x68
 
@@ -33,8 +36,11 @@ class MPU6050:
         bytes = self.i2c.readfrom_mem(self.mpu6050_addr, addr, 2)
         return self._bytes_to_signed_16bit_(bytes[0], bytes[1])
 
-    def read_acc(self):
+    def read_acc_unbiased(self):
         return (self._read_raw_data_(0x3B)/16384, self._read_raw_data_(0x3D)/16384, self._read_raw_data_(0x3F)/16384)
+    
+    def read_acc(self):
+        return (self._read_raw_data_(0x3B)/16384-self.x_accel_bias, self._read_raw_data_(0x3D)/16384-self.y_accel_bias, self._read_raw_data_(0x3F)/16384-self.z_accel_bias)
 
     def read_gyro_unbiased(self):
         return (self._read_raw_data_(0x43)/131, self._read_raw_data_(0x45)/131, self._read_raw_data_(0x47)/131)
@@ -58,6 +64,21 @@ class MPU6050:
         self.x_gyro_bias = GX_sum / num_samples
         self.y_gyro_bias = GY_sum / num_samples
         self.z_gyro_bias = GZ_sum / num_samples
-        print("Calibrating....\nXGB: ",self.x_gyro_bias, "YGB: ", self.y_gyro_bias, "ZGB: ", self.z_gyro_bias, "\n\n")
+        print("Calibrating gyroscope....\nXGB:",self.x_gyro_bias, "YGB:", self.y_gyro_bias, "ZGB:", self.z_gyro_bias, "deg\n\n")
+        self.blink(0.1)
+        time.sleep(2)
+        
+    def calibrate_accel(self):
+        AX_sum, AY_sum, AZ_sum = 0, 0, 0
+        num_samples = 500
+        for i in range(num_samples):
+            a_x, a_y, a_z = self.read_acc_unbiased()
+            AX_sum += a_x
+            AY_sum += a_y
+            AZ_sum += (a_z - 1)
+        self.x_accel_bias = AX_sum / num_samples
+        self.y_accel_bias = AY_sum / num_samples
+        self.z_accel_bias = AZ_sum / num_samples
+        print("Calibrating accelerometer....\nXAB:",self.x_accel_bias, "YAB:", self.y_accel_bias, "ZAB:", self.z_accel_bias, "g\n\n")
         self.blink(0.1)
         time.sleep(2)
