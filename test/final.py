@@ -1,10 +1,21 @@
 import network
 import uasyncio as asyncio
 import json
+import math
 from machine import Pin, ADC
 
 temp_sensor = ADC(Pin(26))
 pulse_sensor = ADC(Pin(27))
+
+# thermistor calibration constants
+VREF = 3.3
+ADC_MAX = 65535.0
+SERIES_RESISTOR_OHMS = 4700.0
+BETA = 3950.0
+T0_K = 298.15
+R0_OHMS = 10000.0
+TEMP_OFFSET_F = -5.0
+THERMISTOR_TO_GND = False
 
 vital_signs = {
     "temperature_f": 98.6,
@@ -95,9 +106,26 @@ async def serve_client(reader, writer):
 
 # --- Sensor Logic (Your Code) ---
 def adc_to_temperature_f(adc_value):
-    voltage = adc_value * (3.3 / 65535)
-    temp_celsius = (voltage - 0.5) * 100.0
-    return ((temp_celsius * 9.0 / 5.0) + 32.0) + 86.0
+    # convert adc -> resistance (divider) -> temperature (beta equation)
+    if adc_value <= 0 or adc_value >= ADC_MAX:
+        return vital_signs["temperature_f"]
+
+    voltage = adc_value * (VREF / ADC_MAX)
+    if voltage <= 0.0 or voltage >= VREF:
+        return vital_signs["temperature_f"]
+
+    if THERMISTOR_TO_GND:
+        resistance = SERIES_RESISTOR_OHMS * (voltage / (VREF - voltage))
+    else:
+        resistance = SERIES_RESISTOR_OHMS * ((VREF - voltage) / voltage)
+
+    try:
+        temp_k = 1.0 / ((1.0 / T0_K) + (1.0 / BETA) * math.log(resistance / R0_OHMS))
+    except ValueError:
+        return vital_signs["temperature_f"]
+
+    temp_celsius = temp_k - 273.15
+    return (temp_celsius * 9.0 / 5.0) + 32.0 + TEMP_OFFSET_F
 
 async def monitor_imu():
     while True:
