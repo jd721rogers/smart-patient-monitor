@@ -4,12 +4,8 @@ import socket
 import time
 
 data = {
-    "ax": 0,
-    "ay": 0,
-    "az": 0,
-    "wx": 0,
-    "wy": 0,
-    "wz": 0,
+    "roll": 0,
+    "pitch": 0,
     "hr": 0,
     "temp": 0
 }
@@ -32,17 +28,13 @@ html = """<!DOCTYPE html>
 
 <div class="container">
     <div class="card">
-        <h2>IMU</h2>
-        <p>X: <span class="value">%s</span></p>
-        <p>Y: <span class="value">%s</span></p>
-        <p>Z: <span class="value">%s</span></p>
+        <h2>IMU Roll</h2>
+        <p>Roll: <span class="value">%s deg</span></p>
     </div>
     
     <div class="card">
-        <h2>Gyro</h2>
-        <p>X: <span class="value">%s</span></p>
-        <p>Y: <span class="value">%s</span></p>
-        <p>Z: <span class="value">%s</span></p>
+        <h2>IMU Pitch</h2>
+        <p>Pitch: <span class="value">%s deg</span></p>
     </div>
 
     <div class="card">
@@ -85,12 +77,8 @@ def run():
         cl.recv(1024)
 
         response = html % (
-            data["ax"],
-            data["ay"],
-            data["az"],
-            data["wx"],
-            data["wy"],
-            data["wz"],
+            data["roll"],
+            data["pitch"],
             data["hr"],
             data["temp"]
         )

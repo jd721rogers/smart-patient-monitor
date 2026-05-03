@@ -1,5 +1,6 @@
 from machine import I2C, Pin
 import time
+import math
 
 class MPU6050:
     def __init__(self, busid, SDA, SCL):
@@ -82,3 +83,138 @@ class MPU6050:
         print("Calibrating accelerometer....\nXAB:",self.x_accel_bias, "YAB:", self.y_accel_bias, "ZAB:", self.z_accel_bias, "g\n\n")
         self.blink(0.1)
         time.sleep(2)
+        
+    # ---------------------------------------------------------------------------
+# Minimal 4x4 matrix helpers (row-major list-of-lists, no numpy)
+# ---------------------------------------------------------------------------
+ 
+def _mat_add(A, B, n):
+    return [[A[i][j] + B[i][j] for j in range(n)] for i in range(n)]
+ 
+def _mat_mul(A, B, n):
+    return [[sum(A[i][k]*B[k][j] for k in range(n)) for j in range(n)] for i in range(n)]
+ 
+def _mat_scale(A, s, n):
+    return [[A[i][j]*s for j in range(n)] for i in range(n)]
+ 
+def _eye(n):
+    return [[1.0 if i==j else 0.0 for j in range(n)] for i in range(n)]
+ 
+def _inv4(M):
+    """Gauss-Jordan inverse of a 4x4 matrix."""
+    A = [row[:] + [1.0 if i==j else 0.0 for j in range(4)] for i, row in enumerate(M)]
+    for col in range(4):
+        pivot = A[col][col]
+        A[col] = [v/pivot for v in A[col]]
+        for row in range(4):
+            if row != col:
+                f = A[row][col]
+                A[row] = [A[row][k] - f*A[col][k] for k in range(8)]
+    return [row[4:] for row in A]
+ 
+def _inv2(M):
+    """Analytic inverse of a 2x2 matrix."""
+    a, b, c, d = M[0][0], M[0][1], M[1][0], M[1][1]
+    det = a*d - b*c
+    return [[d/det, -b/det], [-c/det, a/det]]
+ 
+# ---------------------------------------------------------------------------
+# EKF 2D Attitude Reference System
+# ---------------------------------------------------------------------------
+# State:  x = [phi, theta, b_gx, b_gy]  (roll, pitch, gyro biases) [deg, deg/s]
+# Input:  u = (gx, gy, gz) corrected gyro readings [deg/s]
+# Measurement: z = [phi_acc, theta_acc] from accelerometer [deg]
+#
+# Process model (Euler angles, small-angle approx for bias coupling):
+#   phi_k+1   = phi_k   + dt*(gx - b_gx)
+#   theta_k+1 = theta_k + dt*(gy - b_gy)
+#   b_gx_k+1  = b_gx_k
+#   b_gy_k+1  = b_gy_k
+#
+# Measurement model:
+#   phi_acc   = atan2(ay, az)
+#   theta_acc = atan2(-ax, sqrt(ay^2+az^2))
+# ---------------------------------------------------------------------------
+ 
+class ARS_EKF:
+    def __init__(self, dt,
+                 q_angle=0.01, q_bias=0.003,
+                 r_angle=2.0):
+        self.dt = dt
+ 
+        # state initialization
+        self.x = [0.0, 0.0, 0.0, 0.0]
+ 
+        # covariance initialization
+        self.P = _eye(4)
+ 
+        # Process noise covariance Q (4x4)
+        self.Q = [[0.0]*4 for _ in range(4)]
+        self.Q[0][0] = q_angle
+        self.Q[1][1] = q_angle
+        self.Q[2][2] = q_bias
+        self.Q[3][3] = q_bias
+ 
+        # meas noise
+        self.R = [[r_angle, 0.0], [0.0, r_angle]]
+ 
+    def xP_predict(self, gx, gy):
+        dt = self.dt
+        phi, theta, b_gx, b_gy = self.x
+ 
+        # dynamics model state propagation
+        self.x[0] = phi   + dt * (gx - b_gx)
+        self.x[1] = theta + dt * (gy - b_gy)
+ 
+        # dynamics calculation based on Jacobian
+        F = _eye(4)
+        F[0][2] = -dt   # d(phi)/d(b_gx)
+        F[1][3] = -dt   # d(theta)/d(b_gy)
+ 
+        # covariance propagation
+        FP  = _mat_mul(F, self.P, 4)
+        FPFt = _mat_mul(FP, [[F[j][i] for j in range(4)] for i in range(4)], 4)
+        self.P = _mat_add(FPFt, self.Q, 4)
+ 
+    def meas_update(self, ax, ay, az):
+        # roll and pitch measurements given ax ay az
+        phi_acc   = math.degrees(math.atan2(ay, az))
+        theta_acc = math.degrees(math.atan2(-ax, math.sqrt(ay*ay + az*az)))
+        z = [phi_acc, theta_acc]
+ 
+        # meas prediction from state estimate
+        h = [self.x[0], self.x[1]]
+ 
+        # residual
+        y = [z[0] - h[0], z[1] - h[1]]
+ 
+        # meas->state map matrix
+        H = [[1.0, 0.0, 0.0, 0.0],
+             [0.0, 1.0, 0.0, 0.0]]
+ 
+        # S = H*P*Hᵀ + R  (2x2)
+        # H*P rows: just rows 0 and 1 of P
+       
+        # meas space to state space covariance
+        # H*P extracts rows 0,1 of P; (H*P)*Hᵀ then takes cols 0,1
+        HP = [self.P[0][:], self.P[1][:]]
+        HPHt = [[HP[i][j] for j in range(2)] for i in range(2)]
+        S = [[HPHt[i][j] + self.R[i][j] for j in range(2)] for i in range(2)]
+ 
+        # Kalman gain K = P*Hᵀ*S⁻¹  (4x2)
+        # P*Hᵀ selects cols 0,1 of P (Hᵀ is [I|0]ᵀ)
+        PHt   = [[self.P[i][0], self.P[i][1]] for i in range(4)]
+        S_inv = _inv2(S)
+        K     = [[sum(PHt[i][k]*S_inv[k][j] for k in range(2)) for j in range(2)] for i in range(4)]
+ 
+        # state update
+        for i in range(4):
+            self.x[i] += K[i][0]*y[0] + K[i][1]*y[1]
+ 
+        # covariance update
+        KH    = [[sum(K[i][k]*H[k][j] for k in range(2)) for j in range(4)] for i in range(4)]
+        I_KH  = [[(_eye(4)[i][j] - KH[i][j]) for j in range(4)] for i in range(4)]
+        self.P = _mat_mul(I_KH, self.P, 4)
+ 
+    def get_angles(self):
+        return self.x[0], self.x[1]
