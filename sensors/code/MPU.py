@@ -3,12 +3,12 @@ import time
 import math
 
 class MPU6050:
-    def __init__(self, busid, SDA, SCL):
+    def __init__(self, i2c):
         self.PWR_MGMT_1 = 0x6B
         self.SMPLRT_DIV = 0x19
         self.CONFIG = 0x1A
         self.GYRO_CONFIG = 0x1B
-        self.ACCEL_YOUT_H = 0x3B
+        self.ACCEL_XOUT_H = 0x3B
         self.ACCEL_YOUT_H = 0x3D
         self.ACCEL_ZOUT_H = 0x3F
         self.GYRO_XOUT_H = 0x43
@@ -22,32 +22,38 @@ class MPU6050:
         self.y_accel_bias = 0
         self.z_accel_bias = 0
         
+        self.grav_x = 0.0
+        self.grav_y = 0.0
+        self.grav_z = 1.0  # default: Z-up
+        
         self.mpu6050_addr = 0x68
-
         self.LED = Pin("LED", Pin.OUT)
-
-        self.i2c = I2C(busid, sda=Pin(SDA), scl=Pin(SCL))
-        self.i2c.writeto_mem(self.mpu6050_addr, self.PWR_MGMT_1, b'\x01')
+        self.i2c = i2c
+        time.sleep_ms(1000)
+        self.i2c.writeto(self.mpu6050_addr, bytearray([self.PWR_MGMT_1, 0x00]))
+        time.sleep_ms(100)
+        self.i2c.writeto(self.mpu6050_addr, bytearray([self.PWR_MGMT_1, 0x01]))
         self.start = None
 
     def _bytes_to_signed_16bit_(self, hi, lo):
         return (((hi << 8) | lo) ^ 0x8000) - 0x8000
 
     def _read_raw_data_(self, addr):
-        bytes = self.i2c.readfrom_mem(self.mpu6050_addr, addr, 2)
-        return self._bytes_to_signed_16bit_(bytes[0], bytes[1])
+        self.i2c.writeto(self.mpu6050_addr, bytearray([addr]))
+        data = self.i2c.readfrom(self.mpu6050_addr, 2)
+        return self._bytes_to_signed_16bit_(data[0], data[1])
 
     def read_acc_unbiased(self):
-        return (self._read_raw_data_(0x3B)/16384, self._read_raw_data_(0x3D)/16384, self._read_raw_data_(0x3F)/16384)
+        return (self._read_raw_data_(self.ACCEL_XOUT_H)/16384, self._read_raw_data_(self.ACCEL_YOUT_H)/16384, self._read_raw_data_(self.ACCEL_ZOUT_H)/16384)
     
     def read_acc(self):
-        return (self._read_raw_data_(0x3B)/16384-self.x_accel_bias, self._read_raw_data_(0x3D)/16384-self.y_accel_bias, self._read_raw_data_(0x3F)/16384-self.z_accel_bias)
+        return (self._read_raw_data_(self.ACCEL_XOUT_H)/16384-self.x_accel_bias, self._read_raw_data_(self.ACCEL_YOUT_H)/16384-self.y_accel_bias, self._read_raw_data_(self.ACCEL_ZOUT_H)/16384-self.z_accel_bias)
 
     def read_gyro_unbiased(self):
-        return (self._read_raw_data_(0x43)/131, self._read_raw_data_(0x45)/131, self._read_raw_data_(0x47)/131)
+        return (self._read_raw_data_(self.GYRO_XOUT_H)/131, self._read_raw_data_(self.GYRO_YOUT_H)/131, self._read_raw_data_(self.GYRO_ZOUT_H)/131)
 
     def read_gyro(self):
-        return (self._read_raw_data_(0x43)/131-self.x_gyro_bias, self._read_raw_data_(0x45)/131-self.y_gyro_bias, self._read_raw_data_(0x47)/131-self.z_gyro_bias)
+        return (self._read_raw_data_(self.GYRO_XOUT_H)/131-self.x_gyro_bias, self._read_raw_data_(self.GYRO_YOUT_H)/131-self.y_gyro_bias, self._read_raw_data_(self.GYRO_ZOUT_H)/131-self.z_gyro_bias)
 
     def blink(self, t):
         for i in range(6):
@@ -65,7 +71,7 @@ class MPU6050:
         self.x_gyro_bias = GX_sum / num_samples
         self.y_gyro_bias = GY_sum / num_samples
         self.z_gyro_bias = GZ_sum / num_samples
-        print("Calibrating gyroscope....\nXGB:",self.x_gyro_bias, "YGB:", self.y_gyro_bias, "ZGB:", self.z_gyro_bias, "deg\n\n")
+        print("\nCalibrating gyroscope....\nXGB:",self.x_gyro_bias, "YGB:", self.y_gyro_bias, "ZGB:", self.z_gyro_bias, "deg\n.")
         self.blink(0.1)
         time.sleep(2)
         
@@ -76,13 +82,29 @@ class MPU6050:
             a_x, a_y, a_z = self.read_acc_unbiased()
             AX_sum += a_x
             AY_sum += a_y
-            AZ_sum += (a_z - 1)
-        self.x_accel_bias = AX_sum / num_samples
-        self.y_accel_bias = AY_sum / num_samples
-        self.z_accel_bias = AZ_sum / num_samples
-        print("Calibrating accelerometer....\nXAB:",self.x_accel_bias, "YAB:", self.y_accel_bias, "ZAB:", self.z_accel_bias, "g\n\n")
+            AZ_sum += a_z
+        # measured gravity vector in sensor frame
+        gx = AX_sum / num_samples
+        gy = AY_sum / num_samples
+        gz = AZ_sum / num_samples
+        mag = math.sqrt(gx*gx + gy*gy + gz*gz)
+        # normalise to unit vector
+        self.grav_x = gx / mag
+        self.grav_y = gy / mag
+        self.grav_z = gz / mag
+        # biases: difference between measured and expected gravity in each axis
+        # project expected 1g onto sensor frame from the measured gravity direction
+        self.x_accel_bias = gx - self.grav_x
+        self.y_accel_bias = gy - self.grav_y
+        self.z_accel_bias = gz - self.grav_z
+        print("Calibrating accelerometer....\nXAB:",self.x_accel_bias, "YAB:", self.y_accel_bias, "ZAB:", self.z_accel_bias, "g")
+        print("Gravity vector:", self.grav_x, self.grav_y, self.grav_z)
+        print("Measured mag:  ", mag, "g\n")
         self.blink(0.1)
         time.sleep(2)
+        
+    def get_gravity_vector(self):
+        return (self.grav_x, self.grav_y, self.grav_z)
         
     # ---------------------------------------------------------------------------
 # Minimal 4x4 matrix helpers (row-major list-of-lists, no numpy)
@@ -141,22 +163,24 @@ class ARS_EKF:
                  q_angle=0.01, q_bias=0.003,
                  r_angle=2.0):
         self.dt = dt
- 
         # state initialization
         self.x = [0.0, 0.0, 0.0, 0.0]
- 
         # covariance initialization
         self.P = _eye(4)
- 
         # Process noise covariance Q (4x4)
         self.Q = [[0.0]*4 for _ in range(4)]
         self.Q[0][0] = q_angle
         self.Q[1][1] = q_angle
         self.Q[2][2] = q_bias
         self.Q[3][3] = q_bias
- 
         # meas noise
         self.R = [[r_angle, 0.0], [0.0, r_angle]]
+ 
+    def init_from_gravity(self, grav_x, grav_y, grav_z):
+        # seed roll/pitch from measured gravity direction to help EKF converge
+        self.x[0] = math.degrees(math.atan2(grav_y, grav_z))
+        self.x[1] = math.degrees(math.atan2(-grav_x,
+                    math.sqrt(grav_y*grav_y + grav_z*grav_z)))
  
     def xP_predict(self, gx, gy):
         dt = self.dt
@@ -218,3 +242,47 @@ class ARS_EKF:
  
     def get_angles(self):
         return self.x[0], self.x[1]
+
+class FallDetector:
+    FREE_FALL_G  = 0.4   # g  — below this = free-fall phase
+    IMPACT_G     = 1.5   # g  — above this = impact phase
+    WINDOW_S     = 0.5   # seconds between free-fall and impact
+    ANGLE_DEG    = 15.0  # min attitude change (deg) to confirm fall
+ 
+    def __init__(self, dt, gravity=(0.0, 0.0, 1.0)):
+        self._grav_x, self._grav_y, self._grav_z = gravity
+        self.dt = dt
+        self._ff_timer   = 0.0   # counts up during free-fall phase
+        self._ff_roll    = None  # roll at free-fall onset
+        self._ff_pitch   = None
+        self._in_ff      = False
+        self.fall_detected = False
+ 
+    def update(self, ax, ay, az, roll, pitch):
+        mag = math.sqrt(
+            (ax - self._grav_x)**2 +
+            (ay - self._grav_y)**2 +
+            (az - self._grav_z)**2
+        )
+        self.fall_detected = False
+ 
+        if not self._in_ff:
+            if mag < self.FREE_FALL_G:
+                # free-fall onset
+                self._in_ff   = True
+                self._ff_timer = 0.0
+                self._ff_roll  = roll
+                self._ff_pitch = pitch
+        else:
+            self._ff_timer += self.dt
+            if self._ff_timer > self.WINDOW_S:
+                # timeout — no impact, reset
+                self._in_ff = False
+            elif mag > self.IMPACT_G:
+                # impact detected — validate with attitude change
+                d_roll  = abs(roll  - self._ff_roll)
+                d_pitch = abs(pitch - self._ff_pitch)
+                if d_roll > self.ANGLE_DEG or d_pitch > self.ANGLE_DEG:
+                    self.fall_detected = True
+                self._in_ff = False
+        return self.fall_detected
