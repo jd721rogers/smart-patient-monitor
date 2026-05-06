@@ -214,18 +214,18 @@ class ARS_EKF:
         # dynamics model state propagation
         self.x[0] = phi   + dt * (gx - b_gx)
         self.x[1] = theta + dt * (gy - b_gy)
-        #print("State estimate at meas time using dynamics...")
-        #print("Phi",self.x[0],"Theta",self.x[1],"Gyro X Bias",self.x[2],"Gyro Y Bias",self.x[3])
+        print("State estimate at meas time using dynamics...")
+        print("Phi",self.x[0],"Theta",self.x[1],"Gyro X Bias",self.x[2],"Gyro Y Bias",self.x[3])
  
         # dynamics calculation based on Jacobian
         F = _eye(4)
         F[0][2] = -dt   # d(phi)/d(b_gx)
         F[1][3] = -dt   # d(theta)/d(b_gy)
-        #print("Dynamics Jacobian:")
-        #print(F[0][0], F[0][1], F[0][2], F[0][3])
-        #print(F[1][0], F[1][1], F[1][2], F[1][3])
-        #print(F[2][0], F[2][1], F[2][2], F[2][3])
-        #print(F[3][0], F[3][1], F[3][2], F[3][3])
+        print("Dynamics Jacobian:")
+        print(F[0][0], F[0][1], F[0][2], F[0][3])
+        print(F[1][0], F[1][1], F[1][2], F[1][3])
+        print(F[2][0], F[2][1], F[2][2], F[2][3])
+        print(F[3][0], F[3][1], F[3][2], F[3][3])
  
         # covariance propagation
         FP  = _mat_mul(F, self.P, 4)
@@ -245,8 +245,8 @@ class ARS_EKF:
  
         # residual
         y = [z[0] - h[0], z[1] - h[1]]
-        #print("Measurement Residuals...")
-        #print("y(0)",y[0],"y(1)",y[1])
+        print("Measurement Residuals...")
+        print("y(0)",y[0],"y(1)",y[1])
  
         # meas->state map matrix
         H = [[1.0, 0.0, 0.0, 0.0],
@@ -268,10 +268,10 @@ class ARS_EKF:
         K     = [[sum(PHt[i][k]*S_inv[k][j] for k in range(2)) for j in range(2)] for i in range(4)]
  
         # state update
-        #print("Updating states with Kalman gain-weighted residuals...")
+        print("Updating states with Kalman gain-weighted residuals...")
         for i in range(4):
             self.x[i] += K[i][0]*y[0] + K[i][1]*y[1]
-            #print(self.x[i])
+            print(self.x[i])
  
         # covariance update
         KH    = [[sum(K[i][k]*H[k][j] for k in range(2)) for j in range(4)] for i in range(4)]

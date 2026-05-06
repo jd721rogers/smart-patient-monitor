@@ -131,7 +131,7 @@ while True:
         fall_flag = True
         print("FALL DETECTED")
         
-    #print(f"{fall._ff_timer:.3f},{roll_deg:.1f},{pitch_deg:.1f},{fall.fall_detected}")
+    print(f"{fall._ff_timer:.3f},{roll_deg:.1f},{pitch_deg:.1f},{fall.fall_detected}")
         
     # activity = windowed average of RMS accel readings
     # first, get gravity vector in IMU coordinates based on
