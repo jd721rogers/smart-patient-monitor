@@ -1,0 +1,139 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{comment}
+\usepackage{subfig}
+\newcommand{\centered}[1]{\begin{tabular}{l} #1 \end{tabular}}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\begin{document}
+
+%A Non-Contact Medication Tampering Monitor System Using Radar and Time Series Classification
+%Smart Radar System for Non-Contact Monitoring of Medication Tampering
+%Monitoring Medication Tampering using Radar and Multivariate Time Series Classification
+\title{YOUR TITLE HERE\\
+%{\footnotesize \textsuperscript{*}Note: Sub-titles are not captured %in Xplore and
+%should not be used}
+%\thanks{Identify applicable funding agency here. If none, delete this.}
+}
+
+%\author{\IEEEauthorblockN{1\textsuperscript{st} Elishiah Miller}
+%\IEEEauthorblockA{\textit{Department of Computer Science and Electrical Engineering} %\\
+%\textit{University of Maryland Baltimore County}\\
+%Baltimore, United States \\
+%eli11@umbc.edu}
+%\and
+%\IEEEauthorblockN{2\textsuperscript{nd} Ting Zhu}
+%\IEEEauthorblockA{\textit{Department of Computer Science and Electrical Engineering} %\\
+%\textit{University of Maryland Baltimore County}\\
+%Baltimore, United States \\
+%zt@umbc.edu}
+%}
+
+\maketitle
+
+\begin{abstract}
+YOUR ABSTRACT HERE  
+\end{abstract}
+
+\begin{IEEEkeywords}
+YOUR KEY WORDS HERE
+\end{IEEEkeywords}
+
+\section{Introduction}\label{introduction}
+Continuous patient monitoring in hospital wards is critical for early detection of clinical deterioration, yet current solutions often force a compromise between patient privacy, cost, and system complexity. While camera-based monitoring systems provide comprehensive situational awareness, they introduce significant privacy concerns, particularly in sensitive areas. Conversely, traditional clinical vitals monitors are highly accurate but prohibitively expensive and often restrict patient mobility.
+
+To address these limitations, we propose a low-cost, privacy-preserving ''Blind'' Smart Wristband. This wearable system provides real-time tracking of patient recovery metrics---specifically activity levels, heart rate, and body temperature---without the use of optical cameras. By utilizing highly affordable analog sensors, including a Keyestudio analog thermistor, a Keyestudio analog pulse sensor, and an IMU (inertial measurement unit) driven by a Raspberry Pi Pico, our system bridges the gap between intermittent manual nursing checks and invasive continuous monitors. The system employs asynchronous programming and moving average filtering to condition raw signals locally, transmitting stabilized data to a remote web dashboard to provide healthcare providers with actionable, real-time insights into patient safety.
+
+\section{Related Works}
+
+To contextualize the development of the proposed "Blind" Smart Wristband, a review of existing literature was conducted focusing on patient monitoring technologies, sensor fusion, and clinical warning systems. The reviewed works are organized into five key categories: physiological distress monitoring, accelerometer-based fall detection, clinical vital sign protocols, continuous temperature tracking, and privacy-preserving monitoring. By examining these domains, this section highlights the limitations of current standalone or highly complex monitoring methods and establishes the necessity for a low-cost, multimodal, and privacy-centric wearable device.
+
+\subsection{Physiological Distress Monitoring}
+While mechanical sensors can detect movement, they often fail to capture the physiological state of the patient. Nho et al. demonstrated that fusing accelerometer data with heart rate monitoring significantly improves fall detection accuracy \cite{nho2020}. They found that physiological distress signals, such as sudden tachycardia, serve as critical confirmation of trauma. However, Nho et al. utilized complex user-adaptive algorithms and cluster analysis, which demand significant computational overhead. Our project diverges by applying this fusion concept using a deterministic, lightweight threshold-based logic. This modification addresses the limitation of computational cost, allowing the entire system to run locally on a resource-constrained edge device like the Raspberry Pi Pico 2W without needing a continuous connection to a processing server.
+
+\subsection{Accelerometer Threshold Monitors and Impact Timing}
+Accelerometer-based fall detection has been extensively studied due to its suitability for wearable systems. Bourke et al. developed a fall detection algorithm using an accelerometer, demonstrating that simple threshold-based detection of acceleration magnitude and impact timing could reliably identify falls while maintaining low computational cost \cite{bourke2007}. While highly effective, their optimal results relied on sensors mounted to the trunk or thigh, which can be impractical or uncomfortable for continuous patient wear. Our system builds upon their threshold concept but shifts the sensor placement to the wrist using an MPU-6050 IMU. Because wrist movements naturally generate higher baseline accelerations during daily activities, our approach addresses the limitations of wrist-based false positives by cross-referencing the impact data with the aforementioned physiological distress signals, creating a multimodal safety layer that Bourke et al. did not explore.
+
+\subsection{Relevant Vital Signs for Detecting Patient Deterioration}
+Healthcare providers rely on specific physiological parameters to identify early signs of patient deterioration. Subbe et al. introduced the Modified Early Warning Score (MEWS), which uses vital signs including heart rate, body temperature, respiratory rate, and patient activity level to detect clinical instability \cite{subbe2001}. Their study demonstrated that abnormal trends in heart rate and temperature are strong predictors of adverse events. However, the inherent limitation of the MEWS protocol is its reliance on intermittent, manual data collection by nursing staff, which can lead to delayed interventions. Our system directly addresses this temporal limitation by automating the collection of two of MEWS's most critical parameters (heart rate and temperature). By transitioning these metrics from episodic manual checks to continuous automated data streams, our wristband provides a real-time early warning system.
+
+\subsection{Continuous Temperature Monitoring}
+Standard hospital protocols typically involve intermittent manual temperature checks by nursing staff, often spaced 4 to 8 hours apart. Heyneman et al. conducted a study comparing intermittent checks to continuous monitoring and found that manual checks failed to detect nearly 93\% of fever spikes in critically ill patients \cite{heyneman2015}. This detection gap confirms the medical necessity for continuous sensing. However, traditional clinical continuous monitoring often relies on invasive or expensive core-temperature probes. Our project diverges by implementing a non-invasive, highly cost-effective analog thermistor placed against the wrist skin. Although skin temperature is a proxy for core temperature, our system evaluates whether continuous relative trending (detecting the rapid onset of a fever) using this inexpensive method can provide comparable early-warning utility without the cost or discomfort of traditional clinical monitors.
+
+\subsection{Privacy-Preserving Monitoring}
+While computer vision systems offer high accuracy for patient monitoring, they introduce significant privacy concerns. Luo et al. emphasize that camera-based monitoring in sensitive areas like bedrooms or bathrooms is often rejected by patients due to intrusiveness \cite{luo2024}. To solve this, Luo et al. abstracted camera data into skeleton-based tracking. However, even skeleton or radar-based room sensors require fixed installations and can suffer from physical occlusion (e.g., a patient falling behind a piece of furniture). Our system improves upon this by completely abandoning spatial room tracking in favor of wearable, purely physiological "blind" sensors. This approach not only guarantees absolute visual privacy, ensuring patient acceptance, but also remains with the patient regardless of their location in the ward.
+
+\section{System Overview}\label{system_overview}
+The ''Blind'' Smart Wristband is designed as an edge-computing wearable that continuously monitors physiological and kinetic data, processing it locally before transmitting it to a nurse station dashboard.
+
+\subsection{Hardware Selection}
+To maximize cost-effectiveness and accessibility, the system relies on highly affordable analog components rather than expensive integrated digital clinical sensors. The following subsections will summarize each system hardware component. 
+
+\subsubsection{Central Control Unit}
+The central control unit is a Raspberry Pi Pico 2W, running MicroPython on a dual-core microprocessor. This module can be powered via USB or external battery bus and supports WiFi communication for wireless data transmission.
+
+\subsubsection{Body Temperature Sensor}
+Body temperature monitoring is handled by a Keyestudio analog thermistor. Unlike linear temperature sensors, this NTC (Negative Temperature Coefficient) thermistor exhibits a non-linear resistance change relative to temperature. The module utilizes a voltage divider circuit to output an analog voltage, which is collected on the ADC0 port of the Pico 2W. To calculate precise Celsius readings, the MicroPython firmware applies the Steinhart-Hart equation to translate the raw ADC values.
+
+\subsubsection{Pulse Sensor}
+Patient heart rate is tracked using a Keyestudio Ks0015 Pulse Rate Monitor. This sensor utilizes photoplethysmography to output a continuous analog voltage waveform corresponding to the patient's pulse. The signal is collected on the ADC1 port of the Pico 2W for local filtering and analysis.
+
+\subsubsection{Fall Detection Sensor}
+The MPU-6050 is a compact 6-DOF IMU reporting 3-axis gyroscope and accelerometer readings. This sensor is cheap, easy to integrate in MicroPython, and supports many helpful integration features such as built-in low pass filtering and configurable data rates. The component supports I2C communication for IMU data transmission and the data will be used for fall detection and incident reporting. The sensor communicates with the Pico 2W on GPIO pins 12 and 13, configured as an I2C serial bus.
+
+\subsection{Physical Integration}
+The Pico 2W control board is mounted on an external Breadboard kit and placed in a removable forearm sleeve to house the entire system. During operation, a AA battery pack inside the sleeve provides DC power to the Pico 2W. The thermistor and pulse sensor are taped on the inside of the sleeve to make consistent contact with the skin for accurate temperature and pulse tracking. The MPU-6050 IMU is connected on the breadboard with secure connections to prevent the IMU solution from degrading installation misalignment errors.
+
+\subsection{Software Architecture and Signal Processing}
+Because raw analog signals inherently contain high-frequency electrical noise and motion artifacts, signal conditioning is performed locally on the Pico 2W. We implemented a 5-point moving average filter in MicroPython, which successfully smooths erratic spikes while preserving the core heartbeat waveform and temperature trends.
+
+To handle the disparate polling requirements of the sensors without blocking the processor, the firmware utilizes an asynchronous event loop via \texttt{uasyncio}. This allows the temperature to be polled slowly at 1Hz, the pulse sensor at a medium rate of 10Hz, and the IMU at a high frequency of 100Hz. This design ensures critical sudden-acceleration events are not missed while allowing the CPU to handle web requests during sensor downtime.
+
+The temperature and pulse data are monitored on the Pico 2W for exceeding magnitude thresholds, as well as higher order effects (rates) for asserting an alarm.
+
+The raw IMU data is used in a Extended Kalman Filter to estimate sensor biases by coupling the gyroscope and accelerometer measurements in a 2-D Attitude Reference System. The bias-corrected IMU measurements are used to detect fall events for sudden unexpected movement outside of nominal ranges. The Kalman Filter's estimation of cumulative roll/pitch errors (gyro biases) maintains a level sensor coordinate frame relative to local gravity, providing resilience to system instability caused by gyro drift. The linear acceleration measurements will be prone to sensor drift errors, but can be accommodated by frequent static recalibration routines (reinitialize biases during stationary conditions). 
+
+\subsection{Dashboard and Network Integration}
+The Pico 2W hosts a concurrent HTTP server operating as a background task. It exposes a REST API at a \texttt{/data} endpoint, providing a JSON payload of the filtered sensor data. A remote web dashboard fetches this payload every 500ms, utilizing Chart.js to render real-time vital statistics and a live-scrolling EKG-style graph.
+
+\section{Experiments}\label{experiments}
+Initial experiments focused on validating the analog sensor data acquisition, the efficacy of the digital filtering, and the stability of the asynchronous task scheduling.
+
+\subsection{Sensor Data Collection and Filtering}
+We captured raw ADC values (0-65535) from the analog thermistor and Keyestudio pulse sensors. The initial raw data exhibited significant noise that obscured the underlying physiological trends. By passing the raw voltage readings through the 5-point moving average filter, we successfully conditioned the signals. The filtered pulse data clearly defined the heartbeat waveform, which is critical for preventing false-positive tachycardia or hypoxia alerts in the final system logic. Similarly, the thermistor data, once stabilized, provided a reliable trend for skin temperature monitoring, allowing the system to identify subtle deviations from the patient's baseline without being triggered by transient electrical spikes. 
+
+Additionally, we collected datasets of instantaneous accelerations and angular velocities from the IMU to verify installation coordinate frames and assessing general signal sensitivity to motion. We used this data in an initial calibration routine for bias correction to successfully test the basic integration of an alarm monitor for tripping a magnitude threshold.
+
+\subsection{Asynchronous Task Performance}
+We tested the system's ability to handle concurrent tasks by running the HTTP server alongside the sensor polling loops. Standard network socket requests block the system loop, which would severely compromise the IMU's ability to detect falls at its required 100Hz speed. By utilizing non-blocking sockets and \texttt{uasyncio}, the system successfully yielded processing time back to the sensors, maintaining the required polling rates for the thermistor and pulse sensor without experiencing race conditions or dropped network connections.
+
+\subsection{IMU Calibration and Fall Detection}
+We have tested the bias-corrected IMU measurements to monitor for out-of-range linear accelerations if the resultant magnitude of instantaneous acceleration exceeds 3g's. From testing, this number seemed to indicate the magnitude of a fall severe enough for alert. 
+Improvements to fall detection can be made for: 
+\begin{itemize}
+    \item Removing the local free-fall gravity vector from the total external force magnitude calculation
+    \item Performing a calculation for impulse of a potential event to validate the alarm to avoid steady state deviations
+    \item Monitoring direction of force vector for alarm validation
+    \item Train Machine Learning models with raw accelerometer data simulating falls due to medical ailments to use as additional alarm verification source
+\end{itemize}
+
+\section{Results and Evaluation}\label{results}
+\subsection{SUBSECTION TITLE HERE}
+YOU CAN USE SUBSECTIONS IF NEEDED
+
+\section{Conclusion}
+   
+
+%\section*{Acknowledgment}
+
+\bibliographystyle{IEEEtran}
+\bibliography{IEEEabrv,mybibfile}
+
+\end{document}
