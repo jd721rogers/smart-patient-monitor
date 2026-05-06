@@ -172,8 +172,8 @@ def update(new_data):
     
 def build_page():
     act_val  = data["activity"]
-    # scaling where 0.3g RMS = full bar
-    act_pct  = min(int(act_val * (100/4)), 100)
+    # scaling where 1.5 g RMS = full bar
+    act_pct  = min(int(act_val * (100/1.5)), 100)
     
     #spo2_status = data["spo2_status"]
     #spo2_cls    = spo2_status if spo2_status in ("ok", "warn", "alert") else ""

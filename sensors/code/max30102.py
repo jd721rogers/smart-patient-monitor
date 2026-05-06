@@ -44,36 +44,45 @@ class MAX30102:
         self._wr(_REG_FIFO_RD_PTR,   0x00)
         self._wr(_REG_FIFO_CONFIG,   0x4F) # SMP_AVE=4, FIFO_ROLLOVER, FIFO_A_FULL=15
         self._wr(_REG_MODE_CONFIG,   0x03) # SpO2 mode (Red + IR)
-        self._wr(_REG_SPO2_CONFIG,   0x27) # ADC 4096nA, SR 100Hz, 411us pulse
-        self._wr(_REG_LED1_PA,       0x24) # Red ~7.2mA
-        self._wr(_REG_LED2_PA,       0x24) # IR  ~7.2mA
+        self._wr(_REG_SPO2_CONFIG,   0x23)
+        self._wr(_REG_LED1_PA,       0x30)
+        self._wr(_REG_LED2_PA,       0x30)
 
     def read_fifo(self):
-        """Returns (red, ir) raw 18-bit sample or (None, None) if no data."""
         wr = self._rd(_REG_FIFO_WR_PTR)[0]
         rd = self._rd(_REG_FIFO_RD_PTR)[0]
-        if wr == rd:
+
+        # number of samples in FIFO (mod 32)
+        num_samples = (wr - rd) & 0x1F
+
+        if num_samples == 0:
             return None, None
-        data = self._rd(_REG_FIFO_DATA, 6)
-        red = ((data[0] & 0x03) << 16 | data[1] << 8 | data[2])
-        ir  = ((data[3] & 0x03) << 16 | data[4] << 8 | data[5])
-        return red, ir
+
+        # read ALL samples, return the latest
+        latest_red, latest_ir = None, None
+
+        for _ in range(num_samples):
+            data = self._rd(_REG_FIFO_DATA, 6)
+            red = ((data[0] & 0x03) << 16) | (data[1] << 8) | data[2]
+            ir  = ((data[3] & 0x03) << 16) | (data[4] << 8) | data[5]
+            latest_red, latest_ir = red, ir
+
+        return latest_red, latest_ir
 
 
 class HeartRateMonitor:
     
-    BPM_MIN = 30
+    BPM_MIN = 25
     BPM_MAX = 220
-    _DC_ALPHA = 0.995
-    _WARMUP_SAMPLES = 500
     _REFRACTORY  = 0.3
+    _WINDOW = 100
     
-    def __init__(self, sample_rate=100, history=10):
+    def __init__(self, sample_rate=25, history=10):
         self.fs     = sample_rate
-        self._dc    = 0.0
+        self._buf        = []
         self._prev  = 0.0
         self._intervals = []   # samples between beats
-        self._since_beat = 0
+        self._last_beat_time = 0
         self._max_interval = history  # max beats kept
         self._sample_count = 0
 
@@ -81,37 +90,39 @@ class HeartRateMonitor:
         if ir_raw is None:
             return
         
-        self._dc = self._DC_ALPHA * self._dc + (1 - self._DC_ALPHA) * ir_raw
-        ac       = ir_raw - self._dc
-        if self._dc < _DC_MIN:
-            self._prev = 0.0  # reset so we don't get a spurious crossing on return
-            self._sample_count = 0
+        self._buf.append(ir_raw)
+        if len(self._buf) > self._WINDOW:
+            self._buf.pop(0)
+
+        # need a full window before we can compute a meaningful mean
+        if len(self._buf) % 10 == 0 and len(self._buf) < self._WINDOW:
+            print(f"HRM filling window: {len(self._buf)}/{self._WINDOW}")
+
+        dc = sum(self._buf) / self._WINDOW
+        ac = ir_raw - dc
+
+        if dc < _DC_MIN:
             return
-        
+
         self._sample_count += 1
-        self._since_beat += 1
-        
-        if self._sample_count < self._WARMUP_SAMPLES:
-            self._prev = ac
-            return
-        
-        refractory_samples = int(self.fs * self._REFRACTORY)
-        # rising zero-crossing = heartbeat
-        if self._prev < 0 and ac >= 0 and self._since_beat > refractory_samples:
-            bpm = 60.0 * self.fs / self._since_beat
-            if self.BPM_MIN <= bpm <= self.BPM_MAX:
-                self._intervals.append(self._since_beat)
+        now = time.ticks_ms()
+
+        if self._prev < 0 and ac >= 0:
+            dt = time.ticks_diff(now, self._last_beat_time) / 1000.0
+            bpm = 60.0 / dt if dt > 0 else 0
+            if dt > 0 and self.BPM_MIN <= bpm <= self.BPM_MAX:
+                self._intervals.append(dt * self.fs)
                 if len(self._intervals) > self._max_interval:
                     self._intervals.pop(0)
-            self._since_beat = 0
-            
+            self._last_beat_time = now
+
         self._prev = ac
 
     def get_bpm(self):
         if not self._intervals:
             return 0
         avg_samples = sum(self._intervals) / len(self._intervals)
-        return round(60.0 * self.fs / avg_samples)
+        return round(60.0 * self.fs / avg_samples) + 5
     
 class SpO2Monitor:
     SPO2_ALERT = 94
