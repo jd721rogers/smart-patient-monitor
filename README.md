@@ -1,6 +1,8 @@
 Nurses cannot continuously monitor every patient, leaving critical events like unwitnessed falls or fever spikes undetected. To improve safety without violating privacy via cameras, this acts as a blind sensor node that tracks only physiological data (motion, heart rate, temp) to trigger alerts.
 
 
+HOW TO SETUP:
+Power all components with 3.3 V. MPU6050 and MAX30102 communicate on I2C bus 0 on GP12 and GP13. NTC Thermistor connected to ADC0. Recommend 5kOhm pullup resistors for I2C bus.
 
 Sensors:<br><br>
 ● MPU6050 (Accel/Gyro): Wrist-mounted. Detects fall impacts (>3g)
