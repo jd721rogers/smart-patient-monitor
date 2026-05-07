@@ -14,5 +14,3 @@ rate/SpO2.<br>
 [(https://www.analog.com/media/en/technical-documentation/data-sheets/max30102.pdf)](https://www.analog.com/media/en/technical-documentation/data-sheets/max30102.pdf)]<br>
 ● NTC Thermistor: Wrist skin contact. Monitors continuous
 temperature trends.<br><br><br>
-I bought this one to try:
-https://www.walmart.com/ip/YIEMEEN-Human-Body-Temperature-Sensoring-Module-Skin-Contact-Thermistor-For-Wristbands-And-Fitness-Trackers-With-0-1-C-Accuracy/17614150435
